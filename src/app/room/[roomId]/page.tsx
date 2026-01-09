@@ -1,12 +1,29 @@
 "use client";
 import { useParams } from 'next/navigation';
 import { useRef, useState } from 'react';
+import { useMutation } from '@tanstack/react-query';
+import { client } from '@/lib/client';
+import { useUsername } from '@/hooks/useUsername';
 export default function Page() {
     const params = useParams();
     const roomId = params.roomId as string;
     const [timeRemainin, setTimeRemaining] = useState<number | null>(21);
     const [input, setInput] = useState<string>('');
     const inputRef = useRef<HTMLInputElement>(null);
+    const { username } = useUsername();
+
+    const { mutate: sendMessage, isPending } = useMutation({
+        mutationFn: async ({ text }: { text: string }) => {
+            await client.messages.post(
+                {
+                    sender: username,
+                    text,
+                },
+                { query: { roomId } }
+            );
+        },
+    });
+
 
     return <main className='flex flex-col h-screen max-h-screen overflow-hidden'>
         <header className='border-b border-zinc-800 p-4 flex items-center justify-between bg-zinc-900/30 backdrop-blur-md'>
@@ -41,12 +58,12 @@ export default function Page() {
                     <input autoFocus type="text" value={input} onChange={(e) => setInput(e.target.value)} placeholder='Type message...' onKeyDown={(e) => {
                         if (e.key === 'Enter' && input.trim().length > 0) {
                             e.preventDefault();
-                            // send message
+                            sendMessage({ text: input });
                             inputRef.current?.focus();
                             setInput('');
                      } } } className='w-full bg-black rounded py-2 focus:outline-none placeholder:text-zinc-700 text-sm pl-8 pr-4 text-zinc-400' />
                 </div>
-                <button className=' text-white bg-zinc-800 hover:text-zinc-400 disabled:opacity-50 disabled:cursor-not-allowed pointer-cursor px-6 py-2 text-sm ' >SEND</button>
+                <button onClick= {() => { sendMessage({ text : input}); inputRef.current?.focus(); setInput(''); }} disabled = {input.trim().length === 0 || isPending} className=' text-white bg-zinc-800 hover:text-zinc-400 disabled:opacity-50 disabled:cursor-not-allowed pointer-cursor px-6 py-2 text-sm ' >SEND</button>
             </div>
         </div>
     </main>

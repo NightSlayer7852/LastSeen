@@ -1,31 +1,15 @@
 "use client";
+import { useUsername } from "@/hooks/useUsername";
 import { useMutation } from "@tanstack/react-query";
-import { nanoid } from "nanoid";
-import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { client } from "../lib/client";
 
-const ANIMALS = [ "lion", "tiger", "bear", "eagle", "shark", "wolf", "fox", "owl", "panda", "zebra" ];
-const STORAGE_KEY = "userName";
 
-const generateUserName = () => {
-  const word = ANIMALS[Math.floor(Math.random() * ANIMALS.length)];
-  return `anonymous-${word}-${nanoid(5)}`;
-}
 
 export default function Home() {
-  const [userName, setUserName] = useState("");
+  const { username } = useUsername();
   const router = useRouter();
-  useEffect(() => {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      setUserName(stored);
-      return;
-    }
-    const generate = generateUserName();
-    localStorage.setItem(STORAGE_KEY, generate);
-    setUserName(generate);
-  }, []);
+  
 
 
   const {mutate: createRoom} = useMutation({
@@ -49,7 +33,7 @@ export default function Home() {
             <div className="space-y-2">
             <label className="flex items-center text-zinc-500"> Your Identity </label>
             <div className="flex items-center gap-3">
-              <div className="flex-1 bg-zinc-950 border border-zinc-800 text-sm text-zinc-400 font-mono p-2">{userName}</div>
+              <div className="flex-1 bg-zinc-950 border border-zinc-800 text-sm text-zinc-400 font-mono p-2">{username}</div>
             </div>
           </div> 
 
