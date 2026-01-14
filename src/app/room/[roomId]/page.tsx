@@ -1,16 +1,62 @@
 "use client";
 import { useParams } from 'next/navigation';
 import { useRef, useState } from 'react';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { client } from '@/lib/client';
 import { useUsername } from '@/hooks/useUsername';
+import { format } from 'date-fns';
+import { useRealtime } from '@/lib/realtime-client';
+import {useRouter } from 'next/navigation';
+import { useEffect } from 'react';
+
 export default function Page() {
+    const router = useRouter();
     const params = useParams();
     const roomId = params.roomId as string;
-    const [timeRemainin, setTimeRemaining] = useState<number | null>(21);
+    const [timeRemaining, setTimeRemaining] = useState<number | null>(null);
     const [input, setInput] = useState<string>('');
     const inputRef = useRef<HTMLInputElement>(null);
     const { username } = useUsername();
+    const [copyText, setCopyText] = useState("COPY");
+
+    const {data : ttlData} = useQuery({
+        queryKey: ['ttl', roomId],
+        queryFn: async () => {
+            const res = await client.room.ttl.get({ query: { roomId } });
+            return res.data;
+        },
+    })
+    useEffect(() => {
+        if (ttlData?.ttl !== undefined) {
+            setTimeRemaining(ttlData.ttl);
+        }
+    }, [ttlData]);
+    useEffect(() => {
+        if (timeRemaining === null) return;
+        if (timeRemaining <= 0) {
+            router.push('/?destroyed=true');
+            return;
+        }
+        const interval = setInterval(() => {
+            setTimeRemaining((prev) => {
+                if (prev === null || prev <= 1) {
+                    clearInterval(interval);
+                    return 0;
+                }
+                return prev - 1;
+            });
+        }, 1000);
+        return () => clearInterval(interval);
+    }, [timeRemaining, router]);
+
+
+    const {data : messages, refetch} = useQuery({
+        queryKey: ['messages', roomId],
+        queryFn: async () => {
+            const res = await client.messages.get({ query: { roomId } });
+            return res.data;
+        }
+    })
 
     const { mutate: sendMessage, isPending } = useMutation({
         mutationFn: async ({ text }: { text: string }) => {
@@ -21,9 +67,31 @@ export default function Page() {
                 },
                 { query: { roomId } }
             );
-        },
+        }
     });
 
+    const { mutate: destroyRoom } = useMutation({
+        mutationFn: async () => {
+            await client.room.delete({}, { query: { roomId } });
+        },
+        onSuccess: () => {
+            router.push('/?destroyed=true');
+        }
+    });
+
+    useRealtime({
+        channels: [roomId], 
+        events: ['chat.message', 'chat.destroy'],
+        onData: ({ event }: { event: string }) => {
+            if (event === 'chat.message') { 
+                refetch();
+            }
+
+            if (event === 'chat.destroy') {
+                router.push('/?destroyed=true');
+            }
+        }
+    });
 
     return <main className='flex flex-col h-screen max-h-screen overflow-hidden'>
         <header className='border-b border-zinc-800 p-4 flex items-center justify-between bg-zinc-900/30 backdrop-blur-md'>
@@ -32,25 +100,41 @@ export default function Page() {
                     <span className='text-xs text-zinc-500 uppercase' >Room ID</span>
                     <div className='flex items-center'>
                         <span className='text-md text-green-500'>{roomId}</span>
-                        <button className='ml-2 text-xs text-zinc-400 hover:text-zinc-200 bg-zinc-800 rounded px-2 py-1' onClick={() => { navigator.clipboard.writeText(roomId) }}>Copy</button>
-                    
+                        <button className='ml-2 text-xs text-zinc-400 hover:text-zinc-200 bg-zinc-800 rounded px-2 py-1 cursor-pointer' onClick={() => { navigator.clipboard.writeText(`http://localhost:3000/room/${roomId}`); setCopyText("COPIED"); setTimeout(() => setCopyText("COPY"), 2000); }}>{copyText}</button>        
                     </div>
                 </div>
 
                 <div className='h-8 w-px bg-zinc-800'></div>
                 <div className='flex flex-col items-center'>
                     <span className='text-xs text-zinc-500 uppercase' >Self-destruct</span>
-                    <span className={`flex items-center text-sm font-bold gap-2 ${timeRemainin !== null && timeRemainin < 60 ? 'text-red-500' : 'text-amber-500'}`}>
-                        {timeRemainin !== null ? `${Math.floor(timeRemainin / 60)}:${timeRemainin % 60}` : '--:--'}
+                    <span className={`flex items-center text-sm font-bold gap-2 ${timeRemaining !== null && timeRemaining < 60 ? 'text-red-500' : 'text-amber-500'}`}>
+                        {timeRemaining !== null ? `${Math.floor(timeRemaining / 60)}:${timeRemaining % 60}` : '--:--'}
                     </span>
                 </div>
 
-                <button className='text-xs text-zinc-500 hover:bg-red-500 hover:text-white bg-zinc-800 rounded px-2 py-1 uppercase'>Destroy Now</button>
+                <button onClick={() => destroyRoom()} className='text-xs text-zinc-500 hover:bg-red-500 hover:text-white bg-zinc-800 rounded px-2 py-1 uppercase cursor-pointer'>Destroy Now</button>
             </div>
         </header>
+{/* messages */}
+        <div className="flex-1 overflow-y-auto p-4 scrollbar thin">
+            {messages?.messages.length == 0 && (
+                <div className="flex items-center justify-center h-full">
+                    <p className="text-zinc-600 text-sm font-mono ">No messages yet, start the conversation!</p>
+                </div >)
+            }
+            {messages?.messages.map((message) => (
+                <div key={message.id} className="flex flex-col items-start">
+                    <div className='max-w-[80%] group'>
+                        <div className='flex items-baseline gap-3 mb-1'>
+                            <span className={`text-xs font-bold ${message.sender === username ? 'text-green-500' : 'text-blue-400'}`}>{message.sender === username ? "You" : message.sender}</span>
+                            <span className="text-[10px] text-zinc-600">{format(message.timestamp, "HH:mm")}</span>
+                        </div>
+                        <span className={`text-xs font-mono text-zinc-300`}>{message.text}</span>
+                    </div>
+                </div>))}
+        </div>
 
-
-        <div className='flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin'></div>
+        {/* Input */}
         <div className='border-t border-zinc-800 p-4 bg-zinc-900/30 backdrop-blur-md'>
             <div className='flex items-center gap-4'>
                 <div className='flex-1 relative group'>

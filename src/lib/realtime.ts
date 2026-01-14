@@ -13,7 +13,6 @@ const message = z.object({
 const schema = {
     chat: {
         message,
-
         destroy: z.object({
             isDestroyed: z.literal(true),
         })
