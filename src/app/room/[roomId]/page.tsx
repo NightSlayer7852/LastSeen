@@ -18,6 +18,8 @@ export default function Page() {
     const inputRef = useRef<HTMLInputElement>(null);
     const { username } = useUsername();
     const [copyText, setCopyText] = useState("COPY");
+    const base = typeof window === "undefined" ? "" : window.location.origin;
+    
 
     const {data : ttlData} = useQuery({
         queryKey: ['ttl', roomId],
@@ -100,7 +102,7 @@ export default function Page() {
                     <span className='text-xs text-zinc-500 uppercase' >Room ID</span>
                     <div className='flex items-center'>
                         <span className='text-md text-green-500'>{roomId}</span>
-                        <button className='ml-2 text-xs text-zinc-400 hover:text-zinc-200 bg-zinc-800 rounded px-2 py-1 cursor-pointer' onClick={() => { navigator.clipboard.writeText(`http://localhost:3000/room/${roomId}`); setCopyText("COPIED"); setTimeout(() => setCopyText("COPY"), 2000); }}>{copyText}</button>        
+                        <button className='ml-2 text-xs text-zinc-400 hover:text-zinc-200 bg-zinc-800 rounded px-2 py-1 cursor-pointer' onClick={() => { navigator.clipboard.writeText(`${base}/room/${roomId}`); setCopyText("COPIED"); setTimeout(() => setCopyText("COPY"), 2000); }}>{copyText}</button>        
                     </div>
                 </div>
 

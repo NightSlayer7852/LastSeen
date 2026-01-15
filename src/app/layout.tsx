@@ -3,6 +3,9 @@ import {JetBrains_Mono} from "next/font/google";
 import "./globals.css";
 import { Providers } from "../components/providers";
 
+export const dynamic = "force-dynamic";
+export const revalidate = false;
+
 const jetbrainsMono = JetBrains_Mono({
   variable: "--font-jetbrains-mono",
   subsets: ["latin"],

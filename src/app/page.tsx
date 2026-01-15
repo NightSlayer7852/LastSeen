@@ -12,6 +12,7 @@ export default function Home() {
   const searchParams = useSearchParams();
   const wasDestroyed = searchParams.get("destroyed") === "true";
   const error = searchParams.get("error");
+
   const {mutate: createRoom} = useMutation({
     mutationFn: async () => {
       const res = await client.room.create.post();
